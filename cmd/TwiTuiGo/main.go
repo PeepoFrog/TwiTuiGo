@@ -17,25 +17,39 @@ func main() {
 		fmt.Println(err)
 		log.Fatalf("Error loading .env file")
 	}
-	gamesCursor := ""
 	var authToTwitch model.AuthToTwitch
 	authToTwitch.ClientID = os.Getenv("ClientID")
 	authToTwitch.ClientSecret = os.Getenv("TwitchToken")
 	authToTwitch.AccessToken = os.Getenv("AccessToken")
 
-	games, gamesCursor := controller.GetGames(&authToTwitch, gamesCursor)
-	printBroadcastsResponse(&games)
-	games, gamesCursor = controller.GetGames(&authToTwitch, gamesCursor)
-	printBroadcastsResponse(&games)
+	// gamesCursor := ""
+	// games, gamesCursor := controller.GetGames(&authToTwitch, gamesCursor)
+	// printGamesResponse(&games)
+	// games, gamesCursor = controller.GetGames(&authToTwitch, gamesCursor)
+	// printGamesResponse(&games)
 
+	streams, cursor := controller.GetStreamsFromSelectedGame(&authToTwitch, "", "29595")
+	printStreamsResponse(&streams)
+	streams, _ = controller.GetStreamsFromSelectedGame(&authToTwitch, cursor, "29595")
+	printStreamsResponse(&streams)
 }
-func printBroadcastsResponse(games *model.Games) {
+func printGamesResponse(games *model.Games) {
 	for a, b := range games.Data {
 		fmt.Println(
 			a,
 			"ID:", b.ID,
 			"Name:", b.Name,
 			"IGBDid:", b.IGBDid)
+	}
+	fmt.Println(games.Pagination.Cursor)
+}
+func printStreamsResponse(games *model.Streamers) {
+	for a, b := range games.Data {
+		fmt.Println(
+			a,
+			"gameID:", b.GameID,
+			"Name:", b.GameName,
+			"UserName:", b.UserName)
 	}
 	fmt.Println(games.Pagination.Cursor)
 }
