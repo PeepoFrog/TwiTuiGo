@@ -48,8 +48,9 @@ func printStreamsResponse(games *model.Streamers) {
 		fmt.Println(
 			a,
 			"gameID:", b.GameID,
-			"Name:", b.GameName,
-			"UserName:", b.UserName)
+			"Game:", b.GameName,
+			"UserName:", b.UserName,
+			"Vievers", b.ViewerCount)
 	}
 	fmt.Println(games.Pagination.Cursor)
 }

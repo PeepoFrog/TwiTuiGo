@@ -60,7 +60,6 @@ func getStreams(authToTwitch *model.AuthToTwitch, userID, userLogin, gameID, all
 	if err != nil {
 		log.Fatalln(err)
 	}
-	fmt.Println(apiURL)
 	req.Header = http.Header{
 		"Authorization": {authToTwitch.AccessToken},
 		"Client-Id":     {authToTwitch.ClientID},
