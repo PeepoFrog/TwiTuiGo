@@ -2,14 +2,17 @@ package main
 
 import (
 	"fmt"
+	"github.com/PeepoFrog/TwiTuiGo/internal/controller"
+	"github.com/PeepoFrog/TwiTuiGo/internal/model"
+	// "github.com/PeepoFrog/TwiTuiGo/internal/tui/tview"
+	"github.com/PeepoFrog/TwiTuiGo/internal/tui/bubbletea"
 	"log"
 	"os"
 
-	"github.com/PeepoFrog/TwiTuiGo/internal/controller"
-	"github.com/PeepoFrog/TwiTuiGo/internal/model"
-
 	"github.com/joho/godotenv"
 )
+
+var authToTwitch model.AuthToTwitch
 
 func main() {
 	err := godotenv.Load(".env")
@@ -17,20 +20,30 @@ func main() {
 		fmt.Println(err)
 		log.Fatalf("Error loading .env file")
 	}
-	var authToTwitch model.AuthToTwitch
 	authToTwitch.ClientID = os.Getenv("ClientID")
 	authToTwitch.ClientSecret = os.Getenv("TwitchToken")
 	authToTwitch.AccessToken = os.Getenv("AccessToken")
+	// usingtest()
+	// tviewUserInterface.AuthToTwitch = authToTwitch
+	// tviewUserInterface.Run()
+	bubbleteaUserInterface.AuthToTwitch = authToTwitch
+	bubbleteaUserInterface.Run()
+}
 
-	// gamesCursor := ""
-	// games, gamesCursor := controller.GetGames(&authToTwitch, gamesCursor)
-	// printGamesResponse(&games)
-	// games, gamesCursor = controller.GetGames(&authToTwitch, gamesCursor)
-	// printGamesResponse(&games)
-
-	streams, cursor := controller.GetStreamsFromSelectedGame(&authToTwitch, "", "29595")
+func usingtest() {
+	gamesCursor := ""
+	streamsCursor := ""
+	games, _ := controller.GetGames(&authToTwitch, gamesCursor)
+	gamesCursor = games.Pagination.Cursor
+	printGamesResponse(&games)
+	games, _ = controller.GetGames(&authToTwitch, gamesCursor)
+	gamesCursor = games.Pagination.Cursor
+	printGamesResponse(&games)
+	streams, _ := controller.GetStreamsFromSelectedGame(&authToTwitch, streamsCursor, "29595")
+	streamsCursor = streams.Pagination.Cursor
 	printStreamsResponse(&streams)
-	streams, _ = controller.GetStreamsFromSelectedGame(&authToTwitch, cursor, "29595")
+	streams, _ = controller.GetStreamsFromSelectedGame(&authToTwitch, streamsCursor, "29595")
+	streamsCursor = streams.Pagination.Cursor
 	printStreamsResponse(&streams)
 }
 func printGamesResponse(games *model.Games) {
