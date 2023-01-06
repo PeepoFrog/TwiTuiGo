@@ -63,7 +63,7 @@ func getStreams(authToTwitch *model.AuthToTwitch, userID, userLogin, gameID, all
 	var streams model.Streamers
 	req, err := http.NewRequest("GET", apiURL, nil)
 	if err != nil {
-		log.Fatalln(err)
+		log.Println(err)
 		return streams, err
 	}
 	req.Header = http.Header{

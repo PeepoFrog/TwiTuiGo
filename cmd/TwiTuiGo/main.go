@@ -6,6 +6,7 @@ import (
 	"github.com/PeepoFrog/TwiTuiGo/internal/model"
 	// "github.com/PeepoFrog/TwiTuiGo/internal/tui/tview"
 	"github.com/PeepoFrog/TwiTuiGo/internal/tui/bubbletea"
+	// "github.com/PeepoFrog/TwiTuiGo/internal/tui/tuiTesting"
 	"log"
 	"os"
 
@@ -27,7 +28,11 @@ func main() {
 	// tviewUserInterface.AuthToTwitch = authToTwitch
 	// tviewUserInterface.Run()
 	bubbleteaUserInterface.AuthToTwitch = authToTwitch
+
 	bubbleteaUserInterface.Run()
+	// tuiTesting.AuthToTwitch = authToTwitch
+	// tuiTesting.RunV2()
+
 }
 
 func usingtest() {

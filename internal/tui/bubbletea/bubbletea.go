@@ -1,124 +1,351 @@
 package bubbleteaUserInterface
 
+//6 _ % \ ` ~  ^
 import (
 	"fmt"
 	"github.com/PeepoFrog/TwiTuiGo/internal/controller"
-	models "github.com/PeepoFrog/TwiTuiGo/internal/model"
-	tea "github.com/charmbracelet/bubbletea"
+	myModels "github.com/PeepoFrog/TwiTuiGo/internal/model"
 	"os"
+	"strconv"
+
+	"github.com/charmbracelet/bubbles/list"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
-var AuthToTwitch models.AuthToTwitch
-var GameListCursor = ""
+var AuthToTwitch myModels.AuthToTwitch
 
-type model struct {
-	GamesData []models.Game
-	// GameData    models.Game
-	// GamesStruct models.Games
-	choices  []string
-	cursor   int
-	selected map[int]struct{}
-	err      error
+type status int
+
+const divisor = 3
+
+const (
+	gamesColumn status = iota
+	broadcastsColumn
+	favoritesColumn
+)
+
+/* MODEL MANAGEMENT */
+var models []tea.Model
+
+const (
+	model status = iota
+	form
+)
+
+/* STYLING */
+var (
+	columnStyle = lipgloss.NewStyle().
+			Padding(1, 2).
+			Border(lipgloss.HiddenBorder())
+	focusedStyle = lipgloss.NewStyle().
+			Padding(1, 2).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("62"))
+	helpStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("241"))
+)
+
+/* CUSTOM ITEM */
+
+type Task struct {
+	status      status
+	title       string
+	description string
+	viewers     string
+
+	gameStruct myModels.Game
 }
-type (
-	// gameList models.Games
-	gameList []models.Game
-	errMsg   struct{ err error }
-)
 
-func (e errMsg) Error() string { return e.err.Error() }
-func getGames() tea.Msg {
-	games, err := controller.GetGames(&AuthToTwitch, GameListCursor)
+func NewTask(status status, title, description string, gameid string, gamestruct myModels.Game) Task {
+	return Task{status: status, title: title, description: description, gameStruct: gamestruct}
+}
+
+func (t *Task) Next() {
+	if t.status == favoritesColumn {
+		t.status = gamesColumn
+	} else {
+		t.status++
+	}
+}
+
+// implement the list.Item interface
+func (t Task) FilterValue() string {
+	return t.title
+}
+
+func (t Task) Title() string {
+	return t.title
+}
+
+func (t Task) Description() string {
+	return t.description
+}
+
+/* MAIN MODEL */
+
+type Model struct {
+	loaded               bool
+	focused              status
+	lists                []list.Model
+	err                  error
+	quitting             bool
+	gameStruct           myModels.Games
+	gameList             []myModels.Game
+	broadcastStruct      myModels.Streamers
+	broadcastList        []myModels.Streamer
+	SelectedGameInColumn myModels.Game
+}
+
+func New() *Model {
+	return &Model{}
+}
+
+func (m *Model) LoadBroadcastsFromSelectedGame(id string) tea.Msg {
+	gameStruct, err := controller.GetStreamsFromSelectedGame(&AuthToTwitch, "", id)
 	if err != nil {
-		return errMsg{err}
+		panic(err)
 	}
-	GameListCursor = games.Pagination.Cursor
-	return gameList(games.Data)
-}
-func initialModel() model {
+	m.broadcastStruct = gameStruct
+	var listtoadd []list.Item
 
-	games, _ := controller.GetGames(&AuthToTwitch, GameListCursor)
-	var c []string
-	for _, b := range games.Data {
-		c = append(c, b.Name)
+	for _, b := range gameStruct.Data {
+		v := strconv.Itoa(b.ViewerCount)
+		listtoadd = append(listtoadd, Task{status: broadcastsColumn, title: b.UserName, description: b.GameName + " viewers: " + v})
 	}
-	return model{
-		GamesData: games.Data,
-		choices:   c,
-		selected:  make(map[int]struct{}),
+
+	m.lists[broadcastsColumn].SetItems(listtoadd)
+
+	return nil
+}
+func (m *Model) SelectGame() tea.Msg {
+	selectedItem := m.lists[m.focused].SelectedItem().(Task)
+
+	print(selectedItem.gameStruct.Name + "game ID: " + selectedItem.gameStruct.ID + selectedItem.title)
+	m.SelectedGameInColumn = selectedItem.gameStruct
+	return nil
+}
+func (m *Model) MoveToNext() tea.Msg {
+	selectedItem := m.lists[m.focused].SelectedItem()
+	selectedTask := selectedItem.(Task)
+	m.lists[selectedTask.status].RemoveItem(m.lists[m.focused].Index())
+	selectedTask.Next()
+	m.lists[selectedTask.status].InsertItem(len(m.lists[selectedTask.status].Items())-1, list.Item(selectedTask))
+	return nil
+}
+
+func (m *Model) DeleteCurrent() tea.Msg {
+	if len(m.lists[m.focused].VisibleItems()) > 0 {
+		selectedTask := m.lists[m.focused].SelectedItem().(Task)
+		m.lists[selectedTask.status].RemoveItem(m.lists[m.focused].Index())
+	}
+	return nil
+}
+
+func (m *Model) Next() {
+	if m.focused == favoritesColumn {
+		m.focused = gamesColumn
+	} else {
+		m.focused++
 	}
 }
-func (m model) Init() tea.Cmd {
-	return getGames
+
+func (m *Model) Prev() {
+	if m.focused == gamesColumn {
+		m.focused = favoritesColumn
+	} else {
+		m.focused--
+	}
 }
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+
+func (m *Model) initLists(width, height int) {
+	defaultList := list.New([]list.Item{}, list.NewDefaultDelegate(), width/divisor+5, height-7)
+	defaultList.SetShowHelp(false)
+	m.lists = []list.Model{defaultList, defaultList, defaultList}
+
+	// Init To Do
+	m.lists[gamesColumn].Title = "GAMES"
+	gameslist, err := controller.GetGames(&AuthToTwitch, "")
+	if err != nil {
+		panic(err)
+	}
+	var listtoadd []list.Item
+
+	for _, b := range gameslist.Data {
+		listtoadd = append(listtoadd, Task{status: gamesColumn, title: b.Name, description: "description", gameStruct: b})
+	}
+	m.lists[gamesColumn].SetItems(listtoadd)
+	// m.lists[gamesColumn].SetItems([]list.Item{
+	// 	Task{status: gamesColumn, title: "buy milk", description: "strawberry milk"},
+	// 	Task{status: gamesColumn, title: "eat sushi", description: "negitoro roll, miso soup, rice"},
+	// 	Task{status: gamesColumn, title: "fold laundry", description: "or wear wrinkly t-shirts"},
+	// })
+	// Init in progress
+	m.lists[broadcastsColumn].Title = "BROADCASTS"
+	m.lists[broadcastsColumn].SetItems([]list.Item{
+		Task{status: broadcastsColumn, title: "title", description: "description", viewers: "viewers"},
+	})
+	// Init done
+	m.lists[favoritesColumn].Title = "FAVORITES"
+	m.lists[favoritesColumn].SetItems([]list.Item{
+		Task{status: favoritesColumn, title: "title", description: "description"},
+	})
+}
+
+func (m Model) Init() tea.Cmd {
+	return nil
+}
+
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case gameList:
-		m.GamesData = msg
-		// fmt.Println("worked")
-		return m, nil
-
-	case errMsg:
-		m.err = msg
-		return nil, nil
+	case tea.WindowSizeMsg:
+		if !m.loaded {
+			columnStyle.Width(msg.Width / divisor)
+			focusedStyle.Width(msg.Width / divisor)
+			columnStyle.Height(msg.Height - divisor)
+			focusedStyle.Height(msg.Height - divisor)
+			m.initLists(msg.Width, msg.Height)
+			m.loaded = true
+		}
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
+			m.quitting = true
 			return m, tea.Quit
-		case "up", "k":
-			if m.cursor > 0 {
-				m.cursor--
+		case "left", "h":
+			m.Prev()
+		case "right", "l":
+			m.Next()
+		case "enter":
+			if m.focused == gamesColumn {
+				m.SelectGame()
+				id := m.SelectedGameInColumn.ID
+				m.LoadBroadcastsFromSelectedGame(id)
+				return m, nil
 			}
-		case "down", "j":
-			if m.cursor < len(m.choices)-1 {
-				m.cursor++
+			if m.focused == broadcastsColumn {
+				return m, m.SelectGame
 			}
-		case "enter", " ":
-			_, ok := m.selected[m.cursor]
-			if ok {
-				delete(m.selected, m.cursor)
-			} else {
-				m.selected[m.cursor] = struct{}{}
+			if m.focused == favoritesColumn {
+				return m, m.MoveToNext
 			}
+			return m, m.MoveToNext
+		case "n":
+			models[model] = m // save the state of the current model
+			// models[form] = NewForm(m.focused)
+			return models[form].Update(nil)
+		case "d":
+			return m, m.DeleteCurrent
 		}
+	case Task:
+		task := msg
+		return m, m.lists[task.status].InsertItem(len(m.lists[task.status].Items()), task)
 	}
-	return m, nil
+	var cmd tea.Cmd
+	m.lists[m.focused], cmd = m.lists[m.focused].Update(msg)
+	return m, cmd
 }
-func (m model) View() string {
-	if m.err != nil {
-		return fmt.Sprintf("\nWe had some trouble: %v\n\n", m.err)
-	}
-	s := "games \n \n"
-	cursor := ">"
-	checked := "x"
-	if len(m.GamesData) > 1 {
-		for i, choise := range m.GamesData {
-			cursor = " "
-			if m.cursor == i {
-				cursor = ">"
-			}
-			checked = " "
-			if _, ok := m.selected[i]; ok {
-				checked = "x"
-			}
-			s += fmt.Sprintf("%s [%s] %s \n", cursor, checked, choise.Name)
 
+func (m Model) View() string {
+	if m.quitting {
+		return ""
+	}
+	if m.loaded {
+		todoView := m.lists[gamesColumn].View()
+		inProgView := m.lists[broadcastsColumn].View()
+		doneView := m.lists[favoritesColumn].View()
+		print(m.SelectedGameInColumn.ID)
+		switch m.focused {
+		case broadcastsColumn:
+			return lipgloss.JoinHorizontal(
+				lipgloss.Left,
+				columnStyle.Render(todoView),
+				focusedStyle.Render(inProgView),
+				columnStyle.Render(doneView),
+			)
+		case favoritesColumn:
+			return lipgloss.JoinHorizontal(
+				lipgloss.Left,
+				columnStyle.Render(todoView),
+				columnStyle.Render(inProgView),
+				focusedStyle.Render(doneView),
+			)
+		default:
+			return lipgloss.JoinHorizontal(
+				lipgloss.Left,
+				focusedStyle.Render(todoView),
+				columnStyle.Render(inProgView),
+				columnStyle.Render(doneView),
+			)
 		}
+	} else {
+		return "loading..."
 	}
-	s += fmt.Sprintf("%s [%s] load more \n", cursor, checked)
-
-	s += "\nPress q to exit"
-	return s
-
 }
+
+/* FORM MODEL */
+// type Form struct {
+// 	focused     status
+// 	title       textinput.Model
+// 	description textarea.Model
+// }
+
+// func NewForm(focused status) *Form {
+// 	form := &Form{focused: focused}
+// 	form.title = textinput.New()
+// 	form.title.Focus()
+// 	form.description = textarea.New()
+// 	return form
+// }
+
+// func (m Form) CreateTask() tea.Msg {
+// 	task := NewTask(m.focused, m.title.Value(), m.description.Value())
+// 	return task
+// }
+
+// func (m Form) Init() tea.Cmd {
+// 	return nil
+// }
+
+// func (m Form) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+// 	var cmd tea.Cmd
+// 	switch msg := msg.(type) {
+// 	case tea.KeyMsg:
+// 		switch msg.String() {
+// 		case "ctrl+c", "q":
+// 			return m, tea.Quit
+// 		case "enter":
+// 			if m.title.Focused() {
+// 				m.title.Blur()
+// 				m.description.Focus()
+// 				return m, textarea.Blink
+// 			} else {
+// 				models[form] = m
+// 				return models[model], m.CreateTask
+// 			}
+// 		}
+// 	}
+// 	if m.title.Focused() {
+// 		m.title, cmd = m.title.Update(msg)
+// 		return m, cmd
+// 	} else {
+// 		m.description, cmd = m.description.Update(msg)
+// 		return m, cmd
+// 	}
+// }
+
+// func (m Form) View() string {
+// 	return lipgloss.JoinVertical(lipgloss.Left, m.title.View(), m.description.View())
+// }
+
 func Run() {
-	// p := tea.NewProgram(initialModel())
-	// if err := p.Start(); err != nil {
-	// 	fmt.Println("err", err)
-	// 	os.Exit(1)
-	// }
-	if _, err := tea.NewProgram(model{}).Run(); err != nil {
-		fmt.Printf("Uh oh, there was an error: %v\n", err)
+	// models = []tea.Model{New(), NewForm(games)}
+	models = []tea.Model{New()}
+	m := models[model]
+	p := tea.NewProgram(m)
+	if err := p.Start(); err != nil {
+		fmt.Println(err)
 		os.Exit(1)
 	}
 }
