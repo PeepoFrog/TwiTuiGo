@@ -2,6 +2,7 @@
 Browse twitch in your terminal
 
 ![alt text](https://imgur.com/8PNGBxj)
+
 ![alt text](https://imgur.com/g6aIk0L)
 
 
