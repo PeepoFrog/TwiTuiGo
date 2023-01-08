@@ -1,9 +1,9 @@
 # TwiTuiGo
 Browse twitch in your terminal
 
-![alt text](https://imgur.com/8PNGBxj)
+![alt text](https://i.imgur.com/8PNGBxj.png)
 
-![alt text](https://imgur.com/g6aIk0L)
+![alt text](https://i.imgur.com/g6aIk0L.png)
 
 
 in future integration with streamlink 
