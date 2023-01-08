@@ -1,4 +1,4 @@
-package bubbleteaUserInterface
+package bubbleteaTUI
 
 //6 _ % \ ` ~  ^
 import (
@@ -96,34 +96,62 @@ type Model struct {
 	broadcastStruct      myModels.Streamers
 	broadcastList        []myModels.Streamer
 	SelectedGameInColumn myModels.Game
+	gamesCursor          string
+	gamesCursorState     bool
+	broadcastsCursor     string
 }
 
 func New() *Model {
 	return &Model{}
 }
-
-func (m *Model) LoadBroadcastsFromSelectedGame(id string) tea.Msg {
-	gameStruct, err := controller.GetStreamsFromSelectedGame(&AuthToTwitch, "", id)
+func (m *Model) LoadMoreGames() tea.Msg {
+	print("worked")
+	m.gamesCursorState = false
+	gamesStruct, err := controller.GetGames(&AuthToTwitch, m.gamesCursor)
 	if err != nil {
 		panic(err)
 	}
-	m.broadcastStruct = gameStruct
+	m.gamesCursor = gamesStruct.Pagination.Cursor
 	var listtoadd []list.Item
+	m.gameList = append(m.gameList, gamesStruct.Data...)
 
-	for _, b := range gameStruct.Data {
-		v := strconv.Itoa(b.ViewerCount)
-		listtoadd = append(listtoadd, Task{status: broadcastsColumn, title: b.UserName, description: b.GameName + " viewers: " + v})
+	for _, b := range m.gameList {
+		listtoadd = append(listtoadd, Task{status: gamesColumn, title: b.Name, description: "description", gameStruct: b})
 	}
+	listtoadd = append(listtoadd, Task{status: gamesColumn, title: "LOAD MORE"})
+	m.lists[gamesColumn].SetItems(listtoadd)
 
-	m.lists[broadcastsColumn].SetItems(listtoadd)
+	return nil
+}
+func (m *Model) LoadBroadcastsFromSelectedGame(id string) tea.Msg {
+	if m.gamesCursorState != true {
+		gameStruct, err := controller.GetStreamsFromSelectedGame(&AuthToTwitch, "", id)
+		if err != nil {
+			panic(err)
+		}
+		m.broadcastStruct = gameStruct
+		var listtoadd []list.Item
 
+		for _, b := range gameStruct.Data {
+			v := strconv.Itoa(b.ViewerCount)
+			listtoadd = append(listtoadd, Task{status: broadcastsColumn, title: b.UserName, description: b.GameName + " viewers: " + v})
+		}
+
+		m.lists[broadcastsColumn].SetItems(listtoadd)
+	} else {
+		m.LoadMoreGames()
+	}
 	return nil
 }
 func (m *Model) SelectGame() tea.Msg {
 	selectedItem := m.lists[m.focused].SelectedItem().(Task)
-
-	print(selectedItem.gameStruct.Name + "game ID: " + selectedItem.gameStruct.ID + selectedItem.title)
-	m.SelectedGameInColumn = selectedItem.gameStruct
+	if selectedItem.title == "LOAD MORE" {
+		m.gamesCursorState = true
+		print("loadmorekekw")
+	} else {
+		print(selectedItem.gameStruct.Name + "game ID: " + selectedItem.gameStruct.ID + selectedItem.title)
+		m.SelectedGameInColumn = selectedItem.gameStruct
+	}
 	return nil
 }
 func (m *Model) MoveToNext() tea.Msg {
@@ -167,27 +195,27 @@ func (m *Model) initLists(width, height int) {
 	// Init To Do
 	m.lists[gamesColumn].Title = "GAMES"
 	gameslist, err := controller.GetGames(&AuthToTwitch, "")
+	m.gamesCursor = gameslist.Pagination.Cursor
+	m.gameStruct = gameslist
+	m.gameList = gameslist.Data
 	if err != nil {
 		panic(err)
 	}
+	//init games column
 	var listtoadd []list.Item
-
 	for _, b := range gameslist.Data {
 		listtoadd = append(listtoadd, Task{status: gamesColumn, title: b.Name, description: "description", gameStruct: b})
 	}
+	listtoadd = append(listtoadd, Task{status: gamesColumn, title: "LOAD MORE"})
 	m.lists[gamesColumn].SetItems(listtoadd)
-	// m.lists[gamesColumn].SetItems([]list.Item{
-	// 	Task{status: gamesColumn, title: "buy milk", description: "strawberry milk"},
-	// 	Task{status: gamesColumn, title: "eat sushi", description: "negitoro roll, miso soup, rice"},
-	// 	Task{status: gamesColumn, title: "fold laundry", description: "or wear wrinkly t-shirts"},
-	// })
-	// Init in progress
+	// Init in broadcast column
 	m.lists[broadcastsColumn].Title = "BROADCASTS"
 	m.lists[broadcastsColumn].SetItems([]list.Item{
 		Task{status: broadcastsColumn, title: "title", description: "description", viewers: "viewers"},
 	})
-	// Init done
+	// Init favorites column
 	m.lists[favoritesColumn].Title = "FAVORITES"
+
 	m.lists[favoritesColumn].SetItems([]list.Item{
 		Task{status: favoritesColumn, title: "title", description: "description"},
 	})
@@ -255,7 +283,6 @@ func (m Model) View() string {
 		todoView := m.lists[gamesColumn].View()
 		inProgView := m.lists[broadcastsColumn].View()
 		doneView := m.lists[favoritesColumn].View()
-		print(m.SelectedGameInColumn.ID)
 		switch m.focused {
 		case broadcastsColumn:
 			return lipgloss.JoinHorizontal(

@@ -6,7 +6,7 @@ import (
 	"github.com/PeepoFrog/TwiTuiGo/internal/model"
 	// "github.com/PeepoFrog/TwiTuiGo/internal/tui/tview"
 	"github.com/PeepoFrog/TwiTuiGo/internal/tui/bubbletea"
-	// "github.com/PeepoFrog/TwiTuiGo/internal/tui/tuiTesting"
+	"github.com/PeepoFrog/TwiTuiGo/internal/tui/tuiTesting"
 	"log"
 	"os"
 
@@ -25,12 +25,11 @@ func main() {
 	authToTwitch.ClientSecret = os.Getenv("TwitchToken")
 	authToTwitch.AccessToken = os.Getenv("AccessToken")
 	// usingtest()
-	// tviewUserInterface.AuthToTwitch = authToTwitch
-	// tviewUserInterface.Run()
-	bubbleteaUserInterface.AuthToTwitch = authToTwitch
+	bubbleteaTUI.AuthToTwitch = authToTwitch
+	bubbleteaTUI.Run()
 
-	bubbleteaUserInterface.Run()
-	// tuiTesting.AuthToTwitch = authToTwitch
+	tuiTesting.AuthToTwitch = authToTwitch
+	// bubbleteaUserInterface.Run()
 	// tuiTesting.RunV2()
 
 }
