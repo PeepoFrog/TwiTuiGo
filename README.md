@@ -21,8 +21,7 @@ Place streamlink appimage into folder with binary
 
 **RENAME downloaded streamlink appimage file into `streamlink`**
 
-Allow executing appimage as program 
-command in terminal: `chmod +x streamlink` 
+Allow executing appimage as program by running command in terminal: `chmod +x streamlink` 
 
 Run TwiTuiGo binary
 
