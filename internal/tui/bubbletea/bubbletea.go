@@ -3,13 +3,13 @@ package bubbleteaTUI
 //6 _ % \ ` ~  ^
 import (
 	"fmt"
-	"github.com/PeepoFrog/TwiTuiGo/internal/controller"
-	myModels "github.com/PeepoFrog/TwiTuiGo/internal/model"
 	"os"
+	"os/exec"
 	"strconv"
 
+	"github.com/PeepoFrog/TwiTuiGo/internal/controller"
+	myModels "github.com/PeepoFrog/TwiTuiGo/internal/model"
 	"github.com/charmbracelet/bubbles/list"
-
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -19,7 +19,6 @@ var AuthToTwitch myModels.AuthToTwitch
 type status int
 
 const divisor = 3
-
 const (
 	gamesColumn status = iota
 	broadcastsColumn
@@ -47,21 +46,19 @@ var (
 			Foreground(lipgloss.Color("241"))
 )
 
-/* CUSTOM ITEM */
-
+/* CUSTOM ITEM THATS INSERTS INTO LIST*/
 type Task struct {
-	status      status
-	title       string
-	description string
-	viewers     string
-
-	gameStruct myModels.Game
+	status         status
+	title          string
+	description    string
+	viewers        string
+	gameStruct     myModels.Game
+	streamerStruct myModels.Streamer
 }
 
 func NewTask(status status, title, description string, gameid string, gamestruct myModels.Game) Task {
-	return Task{status: status, title: title, description: description, gameStruct: gamestruct}
+	return Task{status: status, title: title, description: description, gameStruct: gamestruct, viewers: ""}
 }
-
 func (t *Task) Next() {
 	if t.status == favoritesColumn {
 		t.status = gamesColumn
@@ -74,36 +71,35 @@ func (t *Task) Next() {
 func (t Task) FilterValue() string {
 	return t.title
 }
-
 func (t Task) Title() string {
 	return t.title
 }
-
 func (t Task) Description() string {
 	return t.description
 }
 
 /* MAIN MODEL */
-
 type Model struct {
-	loaded               bool
-	focused              status
-	lists                []list.Model
-	err                  error
-	quitting             bool
-	gameStruct           myModels.Games
-	gameList             []myModels.Game
-	broadcastStruct      myModels.Streamers
-	broadcastList        []myModels.Streamer
-	SelectedGameInColumn myModels.Game
-	gamesCursor          string
-	gamesCursorState     bool
-	broadcastsCursor     string
+	loaded                    bool
+	focused                   status
+	lists                     []list.Model
+	err                       error
+	quitting                  bool
+	gameStruct                myModels.Games
+	gameList                  []myModels.Game
+	broadcastStruct           myModels.Streamers
+	broadcastList             []myModels.Streamer
+	SelectedGameInColumn      myModels.Game
+	SelectedBroadcastinColumn myModels.Streamer
+	gamesCursor               string
+	gamesCursorState          bool
+	broadcastsCursor          string
 }
 
 func New() *Model {
 	return &Model{}
 }
+
 func (m *Model) LoadMoreGames() tea.Msg {
 	print("worked")
 	m.gamesCursorState = false
@@ -129,15 +125,20 @@ func (m *Model) LoadBroadcastsFromSelectedGame(id string) tea.Msg {
 		if err != nil {
 			panic(err)
 		}
+		m.broadcastsCursor = gameStruct.Pagination.Cursor
+		m.broadcastList = gameStruct.Data
 		m.broadcastStruct = gameStruct
 		var listtoadd []list.Item
-
-		for _, b := range gameStruct.Data {
-			v := strconv.Itoa(b.ViewerCount)
-			listtoadd = append(listtoadd, Task{status: broadcastsColumn, title: b.UserName, description: b.GameName + " viewers: " + v})
+		// for _, b := range gameStruct.Data {
+		// 	listtoadd = append(listtoadd, Task{status: broadcastsColumn, title: b.UserName, description: b.GameName + " viewers: " + strconv.Itoa(b.ViewerCount), viewers: "300"})
+		// }
+		for _, b := range m.broadcastStruct.Data {
+			listtoadd = append(listtoadd, Task{status: broadcastsColumn, title: b.UserName, description: b.GameName + " viewers: " + strconv.Itoa(b.ViewerCount), viewers: "300", streamerStruct: b})
 		}
-
+		listtoadd = append(listtoadd, Task{status: broadcastsColumn, title: "LOAD MORE"})
 		m.lists[broadcastsColumn].SetItems(listtoadd)
+		// m.lists[broadcastsColumn].SetSize(50, 30)
+
 	} else {
 		m.LoadMoreGames()
 	}
@@ -153,6 +154,46 @@ func (m *Model) SelectGame() tea.Msg {
 		m.SelectedGameInColumn = selectedItem.gameStruct
 	}
 	return nil
+}
+func (m *Model) SelectBroadcast() tea.Msg {
+	selectedItem := m.lists[m.focused].SelectedItem().(Task)
+
+	// print(selectedItem.Title())
+	if selectedItem.title == "LOAD MORE" {
+		m.LoadMoreBroadcasts(selectedItem.gameStruct.ID)
+	} else {
+		m.SelectedBroadcastinColumn = selectedItem.streamerStruct
+		print(m.SelectedBroadcastinColumn.UserName + " HERE ]]]]]]]]]]]]]]]]]")
+		// m.RunStreamlink(m.SelectedBroadcastinColumn.UserName)
+		m.RunStreamlink(m.SelectedBroadcastinColumn.UserName)
+	}
+	return nil
+}
+func (m *Model) LoadMoreBroadcasts(id string) tea.Msg {
+	broadcastStruct, err := controller.GetStreamsFromSelectedGame(&AuthToTwitch, m.broadcastsCursor, m.SelectedGameInColumn.ID)
+	m.broadcastsCursor = broadcastStruct.Pagination.Cursor
+	if err != nil {
+		print(err)
+	}
+	var listtoadd []list.Item
+
+	m.broadcastList = append(m.broadcastList, broadcastStruct.Data...)
+	for _, b := range m.broadcastList {
+		listtoadd = append(listtoadd, Task{status: broadcastsColumn, title: b.UserName, description: b.GameName + " viewers: " + strconv.Itoa(b.ViewerCount), viewers: "300", streamerStruct: b})
+	}
+	listtoadd = append(listtoadd, Task{status: broadcastsColumn, title: "LOAD MORE"})
+	m.lists[broadcastsColumn].SetItems(listtoadd)
+	return nil
+}
+func (m *Model) RunStreamlink(bname string) {
+	stream := "twitch.tv/" + bname
+	// print(stream + "here here here")
+	cmd := exec.Command("./streamlink", stream, "720p60")
+	_, err := cmd.Output()
+	if err != nil {
+		print(err)
+	}
+	// print(string(output))
 }
 func (m *Model) MoveToNext() tea.Msg {
 	selectedItem := m.lists[m.focused].SelectedItem()
@@ -211,7 +252,7 @@ func (m *Model) initLists(width, height int) {
 	// Init in broadcast column
 	m.lists[broadcastsColumn].Title = "BROADCASTS"
 	m.lists[broadcastsColumn].SetItems([]list.Item{
-		Task{status: broadcastsColumn, title: "title", description: "description", viewers: "viewers"},
+		Task{status: broadcastsColumn, title: "title", description: "description", viewers: "viewers", streamerStruct: myModels.Streamer{}},
 	})
 	// Init favorites column
 	m.lists[favoritesColumn].Title = "FAVORITES"
@@ -219,6 +260,13 @@ func (m *Model) initLists(width, height int) {
 	m.lists[favoritesColumn].SetItems([]list.Item{
 		Task{status: favoritesColumn, title: "title", description: "description"},
 	})
+
+	// m.lists[favoritesColumn].SetHeight(20)
+	// var a list.ItemDelegate
+	// a.Height()
+	// m.lists[broadcastsColumn].SetHeight(10)
+	// m.lists[broadcastsColumn].SetSize(40, 10)
+
 }
 
 func (m Model) Init() tea.Cmd {
@@ -228,14 +276,20 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		m.initLists(msg.Width, msg.Height)
 		if !m.loaded {
-			columnStyle.Width(msg.Width / divisor)
-			focusedStyle.Width(msg.Width / divisor)
+			columnStyle.Width(msg.Width/divisor - 5)
+			focusedStyle.Width(msg.Width/divisor - 5)
 			columnStyle.Height(msg.Height - divisor)
 			focusedStyle.Height(msg.Height - divisor)
-			m.initLists(msg.Width, msg.Height)
 			m.loaded = true
+		} else {
+			columnStyle.Width(msg.Width/divisor - 5)
+			focusedStyle.Width(msg.Width/divisor - 5)
+			columnStyle.Height(msg.Height - divisor)
+			focusedStyle.Height(msg.Height - divisor)
 		}
+		m.initLists(msg.Width, msg.Height)
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
@@ -249,14 +303,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.focused == gamesColumn {
 				m.SelectGame()
 				id := m.SelectedGameInColumn.ID
+				print(id)
 				m.LoadBroadcastsFromSelectedGame(id)
 				return m, nil
 			}
 			if m.focused == broadcastsColumn {
-				return m, m.SelectGame
+				print("pepeg broadcasts")
+				m.SelectBroadcast()
+				// streamName := m.SelectedBroadcastinColumn.UserName
+				// m.RunStreamlink(streamName)
+				return m, nil
 			}
 			if m.focused == favoritesColumn {
-				return m, m.MoveToNext
+				return m, nil
 			}
 			return m, m.MoveToNext
 		case "n":
@@ -312,6 +371,7 @@ func (m Model) View() string {
 }
 
 func Run() {
+	// models = []tea.Model{New(), NewForm(games)}
 	models = []tea.Model{New()}
 	m := models[model]
 	p := tea.NewProgram(m)
