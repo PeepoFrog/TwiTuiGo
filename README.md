@@ -8,9 +8,12 @@ Browse twitch in your terminal with streamlink
 ![alt text](https://i.imgur.com/g6aIk0L.png)
 
 **How to run:**
- Download TwiTuiGo binary  
- Download streamlink appimage   
+
+Download TwiTuiGo binary  
+Download streamlink appimage   
+
 > https://github.com/streamlink/streamlink-appimage/releases
+
 Place streamlink appimage into folder with binary
 Allow executing appimage as program 
 Run TwiTuiGo binary
