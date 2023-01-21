@@ -28,7 +28,7 @@ func main() {
 	//
 	bubbleteaTUI.AuthToTwitch = authToTwitch
 	tuiTesting.AuthToTwitch = authToTwitch
-	bubbleteaTUI.Run()
-	// tuiTesting.Run()
+	// bubbleteaTUI.Run()
+	tuiTesting.Run()
 
 }
