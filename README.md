@@ -7,6 +7,7 @@ Browse twitch in your terminal with streamlink
 
 
 Download TwiTuiGo binary  
+
 Download streamlink appimage   
 
 
