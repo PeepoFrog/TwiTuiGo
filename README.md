@@ -20,7 +20,7 @@ Place streamlink appimage into folder with binary
 Allow executing appimage as program 
 Run TwiTuiGo binary
 
-***Without streamlink appimage you wont able to watch broadcast, only browsing ***
+***Without streamlink appimage you wont able to watch broadcast, only browsing***
 
 
 ![alt text](https://github.com/PeepoFrog/TwiTuiGo/blob/main/screenshots/example1.gif?raw=true)
