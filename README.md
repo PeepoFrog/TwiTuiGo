@@ -19,6 +19,8 @@ Download streamlink appimage
 
 Place streamlink appimage into folder with binary
 
+**RENAME downloaded streamlink appimage file into `streamlink`**
+
 Allow executing appimage as program 
 
 Run TwiTuiGo binary
