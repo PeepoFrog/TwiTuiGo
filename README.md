@@ -17,7 +17,9 @@ Download streamlink appimage
 
 
 Place streamlink appimage into folder with binary
+
 Allow executing appimage as program 
+
 Run TwiTuiGo binary
 
 ***Without streamlink appimage you wont able to watch broadcast, only browsing***
